@@ -26,6 +26,28 @@ export interface ApprovalDecision {
 }
 
 /**
+ * Splits a shell command into individual commands by operators (&&, ||, ;, |)
+ * This is a simple string-based split that handles basic cases but doesn't
+ * handle complex shell syntax like quoted strings or escaped operators.
+ *
+ * @param command - The full command string
+ * @returns Array of individual commands
+ */
+function splitCommandChain(command: string): string[] {
+	// Split by &&, ||, ;, or | (pipe)
+	// We use a regex that captures the operators and then filters them out
+	const parts = command.split(/\s*(&&|\|\||;|\|)\s*/)
+
+	// Filter out the operators themselves and empty strings, keep only the commands
+	const commands = parts.filter((part) => {
+		// Keep items that are not operators
+		return part && !part.match(/^(&&|\|\||;|\|)$/)
+	})
+
+	return commands.map((cmd) => cmd.trim()).filter((cmd) => cmd.length > 0)
+}
+
+/**
  * Helper function to check if a command matches allowed/denied patterns
  * Supports hierarchical matching:
  * - "git" matches "git status", "git commit", etc.
@@ -197,20 +219,18 @@ function getCommandApprovalDecision(
 	const allowedCommands = config.execute?.allowed ?? []
 	const deniedCommands = config.execute?.denied ?? []
 
+	// Split command into individual commands if it contains operators
+	const commands = splitCommandChain(command)
+
 	logs.info("Checking command approval", "approvalDecision", {
 		command,
 		rawText: message.text,
+		splitCommands: commands,
 		allowedCommands,
 		deniedCommands,
 		executeEnabled: config.execute?.enabled,
 		configExecute: config.execute,
 	})
-
-	// Check denied list first (takes precedence)
-	if (matchesCommandPattern(command, deniedCommands)) {
-		logs.debug("Command matches denied pattern", "approvalDecision", { command })
-		return isCIMode ? { action: "auto-reject", message: CI_MODE_MESSAGES.AUTO_REJECTED } : { action: "manual" }
-	}
 
 	// If allowed list is empty, don't allow any commands
 	if (allowedCommands.length === 0) {
@@ -218,21 +238,35 @@ function getCommandApprovalDecision(
 		return isCIMode ? { action: "auto-reject", message: CI_MODE_MESSAGES.AUTO_REJECTED } : { action: "manual" }
 	}
 
-	// Check if command matches allowed patterns
-	if (matchesCommandPattern(command, allowedCommands)) {
-		logs.info("Command matches allowed pattern - auto-approving", "approvalDecision", {
-			command,
-			matchedAgainst: allowedCommands,
-		})
-		return { action: "auto-approve" }
+	// Check each command in the chain
+	for (const cmd of commands) {
+		// Check denied list first (takes precedence)
+		if (matchesCommandPattern(cmd, deniedCommands)) {
+			logs.debug("Command in chain matches denied pattern", "approvalDecision", {
+				command: cmd,
+				fullCommand: command,
+			})
+			return isCIMode ? { action: "auto-reject", message: CI_MODE_MESSAGES.AUTO_REJECTED } : { action: "manual" }
+		}
+
+		// Check if this command matches allowed patterns
+		if (!matchesCommandPattern(cmd, allowedCommands)) {
+			logs.info("Command in chain does not match any allowed pattern", "approvalDecision", {
+				command: cmd,
+				fullCommand: command,
+				allowedCommands,
+			})
+			return isCIMode ? { action: "auto-reject", message: CI_MODE_MESSAGES.AUTO_REJECTED } : { action: "manual" }
+		}
 	}
 
-	logs.info("Command does not match any allowed pattern", "approvalDecision", {
+	// All commands in the chain are allowed
+	logs.info("All commands in chain match allowed patterns - auto-approving", "approvalDecision", {
 		command,
-		allowedCommands,
-		deniedCommands,
+		splitCommands: commands,
+		matchedAgainst: allowedCommands,
 	})
-	return isCIMode ? { action: "auto-reject", message: CI_MODE_MESSAGES.AUTO_REJECTED } : { action: "manual" }
+	return { action: "auto-approve" }
 }
 
 /**
