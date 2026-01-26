@@ -27,24 +27,110 @@ export interface ApprovalDecision {
 
 /**
  * Splits a shell command into individual commands by operators (&&, ||, ;, |)
- * This is a simple string-based split that handles basic cases but doesn't
- * handle complex shell syntax like quoted strings or escaped operators.
+ * Handles quoted strings and escaped operators properly:
+ * - Ignores operators inside single or double quotes
+ * - Ignores escaped operators (preceded by backslash)
  *
  * @param command - The full command string
  * @returns Array of individual commands
  */
 function splitCommandChain(command: string): string[] {
-	// Split by &&, ||, ;, or | (pipe)
-	// We use a regex that captures the operators and then filters them out
-	const parts = command.split(/\s*(&&|\|\||;|\|)\s*/)
+	const commands: string[] = []
+	let currentCommand = ""
+	let inSingleQuote = false
+	let inDoubleQuote = false
+	let i = 0
 
-	// Filter out the operators themselves and empty strings, keep only the commands
-	const commands = parts.filter((part) => {
-		// Keep items that are not operators
-		return part && !part.match(/^(&&|\|\||;|\|)$/)
-	})
+	while (i < command.length) {
+		const char = command[i]
+		const nextChar = command[i + 1]
+		const prevChar = i > 0 ? command[i - 1] : ""
 
-	return commands.map((cmd) => cmd.trim()).filter((cmd) => cmd.length > 0)
+		// Check if current character is escaped (preceded by backslash)
+		const isEscaped = prevChar === "\\" && (i < 2 || command[i - 2] !== "\\")
+
+		// Handle quotes (only if not escaped)
+		if (!isEscaped) {
+			if (char === "'" && !inDoubleQuote) {
+				inSingleQuote = !inSingleQuote
+				currentCommand += char
+				i++
+				continue
+			}
+			if (char === '"' && !inSingleQuote) {
+				inDoubleQuote = !inDoubleQuote
+				currentCommand += char
+				i++
+				continue
+			}
+		}
+
+		// If we're inside quotes, just add the character
+		if (inSingleQuote || inDoubleQuote) {
+			currentCommand += char
+			i++
+			continue
+		}
+
+		// Check for operators (only if not escaped and not in quotes)
+		if (!isEscaped) {
+			// Check for && operator
+			if (char === "&" && nextChar === "&") {
+				const trimmed = currentCommand.trim()
+				if (trimmed) {
+					commands.push(trimmed)
+				}
+				currentCommand = ""
+				i += 2
+				continue
+			}
+
+			// Check for || operator
+			if (char === "|" && nextChar === "|") {
+				const trimmed = currentCommand.trim()
+				if (trimmed) {
+					commands.push(trimmed)
+				}
+				currentCommand = ""
+				i += 2
+				continue
+			}
+
+			// Check for single | (pipe)
+			if (char === "|" && nextChar !== "|") {
+				const trimmed = currentCommand.trim()
+				if (trimmed) {
+					commands.push(trimmed)
+				}
+				currentCommand = ""
+				i++
+				continue
+			}
+
+			// Check for semicolon
+			if (char === ";") {
+				const trimmed = currentCommand.trim()
+				if (trimmed) {
+					commands.push(trimmed)
+				}
+				currentCommand = ""
+				i++
+				continue
+			}
+		}
+
+		// Regular character - add to current command
+		currentCommand += char
+		i++
+	}
+
+	// Add the last command if there is one
+	const trimmed = currentCommand.trim()
+	if (trimmed) {
+		commands.push(trimmed)
+	}
+
+	return commands
 }
 
 /**

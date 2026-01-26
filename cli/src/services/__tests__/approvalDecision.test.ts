@@ -550,6 +550,138 @@ describe("approvalDecision", () => {
 					expect(decision.action).toBe("auto-reject")
 					expect(decision.message).toBe(CI_MODE_MESSAGES.AUTO_REJECTED)
 				})
+
+				it("should ignore operators inside double quotes", () => {
+					const message = createMessage("command", JSON.stringify({ command: 'echo "hello && world"' }))
+					const config = {
+						...createBaseConfig(),
+						execute: {
+							enabled: true,
+							allowed: ["echo"],
+							denied: [],
+						},
+					}
+					const decision = getApprovalDecision(message, config, false)
+					expect(decision.action).toBe("auto-approve")
+				})
+
+				it("should ignore operators inside single quotes", () => {
+					const message = createMessage("command", JSON.stringify({ command: "echo 'test || fail'" }))
+					const config = {
+						...createBaseConfig(),
+						execute: {
+							enabled: true,
+							allowed: ["echo"],
+							denied: [],
+						},
+					}
+					const decision = getApprovalDecision(message, config, false)
+					expect(decision.action).toBe("auto-approve")
+				})
+
+				it("should handle mixed quotes and operators", () => {
+					const message = createMessage(
+						"command",
+						JSON.stringify({ command: 'echo "test && stuff" && echo "more"' }),
+					)
+					const config = {
+						...createBaseConfig(),
+						execute: {
+							enabled: true,
+							allowed: ["echo"],
+							denied: [],
+						},
+					}
+					const decision = getApprovalDecision(message, config, false)
+					expect(decision.action).toBe("auto-approve")
+				})
+
+				it("should ignore escaped operators", () => {
+					const message = createMessage("command", JSON.stringify({ command: "echo hello\\&\\&world" }))
+					const config = {
+						...createBaseConfig(),
+						execute: {
+							enabled: true,
+							allowed: ["echo"],
+							denied: [],
+						},
+					}
+					const decision = getApprovalDecision(message, config, false)
+					expect(decision.action).toBe("auto-approve")
+				})
+
+				it("should handle command with escaped semicolon", () => {
+					const message = createMessage("command", JSON.stringify({ command: "echo test\\;more" }))
+					const config = {
+						...createBaseConfig(),
+						execute: {
+							enabled: true,
+							allowed: ["echo"],
+							denied: [],
+						},
+					}
+					const decision = getApprovalDecision(message, config, false)
+					expect(decision.action).toBe("auto-approve")
+				})
+
+				it("should handle nested quotes correctly", () => {
+					const message = createMessage("command", JSON.stringify({ command: 'echo "it\'s a test"' }))
+					const config = {
+						...createBaseConfig(),
+						execute: {
+							enabled: true,
+							allowed: ["echo"],
+							denied: [],
+						},
+					}
+					const decision = getApprovalDecision(message, config, false)
+					expect(decision.action).toBe("auto-approve")
+				})
+
+				it("should split commands when operators are outside quotes", () => {
+					const message = createMessage(
+						"command",
+						JSON.stringify({ command: 'echo "test && quoted" && echo "second"' }),
+					)
+					const config = {
+						...createBaseConfig(),
+						execute: {
+							enabled: true,
+							allowed: ["echo"],
+							denied: [],
+						},
+					}
+					const decision = getApprovalDecision(message, config, false)
+					expect(decision.action).toBe("auto-approve")
+				})
+
+				it("should handle pipe inside quotes", () => {
+					const message = createMessage("command", JSON.stringify({ command: 'echo "test | pipe"' }))
+					const config = {
+						...createBaseConfig(),
+						execute: {
+							enabled: true,
+							allowed: ["echo"],
+							denied: [],
+						},
+					}
+					const decision = getApprovalDecision(message, config, false)
+					expect(decision.action).toBe("auto-approve")
+				})
+
+				it("should split on real pipe outside quotes", () => {
+					const message = createMessage("command", JSON.stringify({ command: 'echo "test" | grep test' }))
+					const config = {
+						...createBaseConfig(),
+						execute: {
+							enabled: true,
+							allowed: ["echo", "grep"],
+							denied: [],
+						},
+					}
+					const decision = getApprovalDecision(message, config, false)
+					expect(decision.action).toBe("auto-approve")
+				})
 			})
 		})
 
