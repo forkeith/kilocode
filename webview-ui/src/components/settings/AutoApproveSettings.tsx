@@ -45,6 +45,7 @@ type AutoApproveSettingsProps = HTMLAttributes<HTMLDivElement> & {
 		| "alwaysAllowWriteProtected"
 		| "alwaysAllowDelete" // kilocode_change
 		| "alwaysAllowBrowser"
+		| "alwaysAllowWeb" // kilocode_change
 		| "alwaysAllowMcp"
 		| "alwaysAllowModeSwitch"
 		| "alwaysAllowSubtasks"

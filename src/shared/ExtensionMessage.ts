@@ -394,6 +394,7 @@ export type ExtensionState = Pick<
 	| "alwaysAllowWriteProtected"
 	| "alwaysAllowDelete" // kilocode_change
 	| "alwaysAllowBrowser"
+	| "alwaysAllowWeb" // kilocode_change: Auto-approve web tools (webFetch, webSearch)
 	| "alwaysAllowMcp"
 	| "alwaysAllowModeSwitch"
 	| "alwaysAllowSubtasks"
