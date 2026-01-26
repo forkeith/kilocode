@@ -208,6 +208,7 @@ export interface ExtensionMessage {
 		| "chatCompletionResult" // kilocode_change: FIM completion result for chat text area
 		| "claudeCodeRateLimits"
 		| "customToolsResult"
+		| "askReviewScope" // kilocode_change: Review mode scope selection
 	text?: string
 	// kilocode_change start
 	completionRequestId?: string // Correlation ID from request
@@ -376,6 +377,23 @@ export interface ExtensionMessage {
 	deviceAuthError?: string
 	// kilocode_change end: Device auth data
 	tools?: SerializedCustomToolDefinition[] // For customToolsResult
+	// kilocode_change start: Review mode
+	reviewScopeInfo?: {
+		uncommitted: {
+			available: boolean
+			fileCount: number
+			filePreview?: string[]
+		}
+		branch: {
+			available: boolean
+			currentBranch: string
+			baseBranch: string
+			fileCount: number
+			filePreview?: string[]
+		}
+		error?: string
+	}
+	// kilocode_change end: Review mode
 }
 
 export type ExtensionState = Pick<

@@ -302,6 +302,7 @@ export interface WebviewMessage {
 		| "downloadErrorDiagnostics"
 		| "requestClaudeCodeRateLimits"
 		| "refreshCustomTools"
+		| "reviewScopeSelected" // kilocode_change: User selected review scope
 	text?: string
 	suggestionLength?: number // kilocode_change: Length of accepted suggestion for telemetry
 	completionRequestId?: string // kilocode_change
@@ -418,6 +419,9 @@ export interface WebviewMessage {
 		codebaseIndexOpenRouterApiKey?: string
 	}
 	updatedSettings?: RooCodeSettings
+	// kilocode_change start: Review mode
+	reviewScope?: "uncommitted" | "branch"
+	// kilocode_change end: Review mode
 }
 
 // kilocode_change: Create discriminated union for type-safe messages
