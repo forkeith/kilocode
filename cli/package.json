@@ -117,6 +117,7 @@
 		"say": "^0.16.0",
 		"semver": "^7.7.3",
 		"serialize-error": "^12.0.0",
+		"shell-quote": "^1.8.3",
 		"shiki": "^3.21.0",
 		"simple-git": "^3.30.0",
 		"socket.io-client": "^4.8.3",

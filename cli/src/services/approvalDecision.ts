@@ -25,112 +25,54 @@ export interface ApprovalDecision {
 	message?: string
 }
 
+import { parse as parseShellCommand } from "shell-quote"
+
 /**
  * Splits a shell command into individual commands by operators (&&, ||, ;, |)
- * Handles quoted strings and escaped operators properly:
+ * Uses the shell-quote library for proper shell syntax parsing:
  * - Ignores operators inside single or double quotes
  * - Ignores escaped operators (preceded by backslash)
+ * - Handles complex shell syntax correctly
  *
  * @param command - The full command string
  * @returns Array of individual commands
  */
 function splitCommandChain(command: string): string[] {
-	const commands: string[] = []
-	let currentCommand = ""
-	let inSingleQuote = false
-	let inDoubleQuote = false
-	let i = 0
+	try {
+		const parsed = parseShellCommand(command)
+		const commands: string[] = []
+		let currentCommand: string[] = []
 
-	while (i < command.length) {
-		const char = command[i]
-		const nextChar = command[i + 1]
-		const prevChar = i > 0 ? command[i - 1] : ""
-
-		// Check if current character is escaped (preceded by backslash)
-		const isEscaped = prevChar === "\\" && (i < 2 || command[i - 2] !== "\\")
-
-		// Handle quotes (only if not escaped)
-		if (!isEscaped) {
-			if (char === "'" && !inDoubleQuote) {
-				inSingleQuote = !inSingleQuote
-				currentCommand += char
-				i++
-				continue
-			}
-			if (char === '"' && !inSingleQuote) {
-				inDoubleQuote = !inDoubleQuote
-				currentCommand += char
-				i++
-				continue
+		for (const token of parsed) {
+			// Check if this is an operator
+			if (typeof token === "object" && token !== null && "op" in token) {
+				const op = (token as { op: string }).op
+				// Split on &&, ||, ;, and | operators
+				if (op === "&&" || op === "||" || op === ";" || op === "|") {
+					if (currentCommand.length > 0) {
+						commands.push(currentCommand.join(" "))
+						currentCommand = []
+					}
+				}
+			} else if (typeof token === "string") {
+				currentCommand.push(token)
 			}
 		}
 
-		// If we're inside quotes, just add the character
-		if (inSingleQuote || inDoubleQuote) {
-			currentCommand += char
-			i++
-			continue
+		// Add the last command if there is one
+		if (currentCommand.length > 0) {
+			commands.push(currentCommand.join(" "))
 		}
 
-		// Check for operators (only if not escaped and not in quotes)
-		if (!isEscaped) {
-			// Check for && operator
-			if (char === "&" && nextChar === "&") {
-				const trimmed = currentCommand.trim()
-				if (trimmed) {
-					commands.push(trimmed)
-				}
-				currentCommand = ""
-				i += 2
-				continue
-			}
-
-			// Check for || operator
-			if (char === "|" && nextChar === "|") {
-				const trimmed = currentCommand.trim()
-				if (trimmed) {
-					commands.push(trimmed)
-				}
-				currentCommand = ""
-				i += 2
-				continue
-			}
-
-			// Check for single | (pipe)
-			if (char === "|" && nextChar !== "|") {
-				const trimmed = currentCommand.trim()
-				if (trimmed) {
-					commands.push(trimmed)
-				}
-				currentCommand = ""
-				i++
-				continue
-			}
-
-			// Check for semicolon
-			if (char === ";") {
-				const trimmed = currentCommand.trim()
-				if (trimmed) {
-					commands.push(trimmed)
-				}
-				currentCommand = ""
-				i++
-				continue
-			}
-		}
-
-		// Regular character - add to current command
-		currentCommand += char
-		i++
+		return commands
+	} catch (error) {
+		// If parsing fails, fall back to treating the entire command as one
+		logs.warn("Failed to parse shell command, treating as single command", "approvalDecision", {
+			command,
+			error: error instanceof Error ? error.message : String(error),
+		})
+		return [command]
 	}
-
-	// Add the last command if there is one
-	const trimmed = currentCommand.trim()
-	if (trimmed) {
-		commands.push(trimmed)
-	}
-
-	return commands
 }
 
 /**
